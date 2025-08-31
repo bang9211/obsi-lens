@@ -1,0 +1,11 @@
+{
+	"id": "obsi-lens",
+	"name": "Obsi-Lens",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Professional image viewer with drawing tools, smart copy, and seamless navigation",
+	"author": "YT Han",
+	"authorUrl": "",
+	"fundingUrl": "",
+	"isDesktopOnly": false
+}

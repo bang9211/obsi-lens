@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+main.js
+*.js.map
+
+# Development
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Optional npm cache directory
+.npm
+
+.claude
+.serena

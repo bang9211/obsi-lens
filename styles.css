@@ -1,0 +1,445 @@
+/* Use default modal background - remove custom background override */
+
+/* Allow body scroll when modal is larger than viewport */
+body.image-viewer-active {
+  overflow: hidden !important;
+}
+
+/* Fullscreen transparent modal */
+.image-viewer-modal.modal {
+  width: 200vw !important;
+  height: 200vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  min-width: none !important;
+  min-height: none !important;
+  left: -50vw !important;
+  top: -50vh !important;
+  background: transparent !important;  
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Image Viewer Modal Content - Fullscreen Transparent */
+.image-viewer-modal .modal-content {
+  width: 200vw !important;
+  height: 200vh !important;
+  left: -50vw !important;
+  top: -50vh !important;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  margin: 0 !important;
+  overflow: visible;
+  resize: none;
+  z-index: 1000;
+}
+
+
+.image-viewer-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: visible;
+  background: transparent !important;
+  position: relative;
+  width: 200vw;
+  height: 200vh;
+  padding: 50vh 50vw 50vh 50vw;
+  box-sizing: border-box;
+}
+
+.image-viewer-image {
+  /* Remove size constraints to allow true image dimensions */
+  object-fit: contain;
+  cursor: grab;
+  user-select: none;
+  display: block;
+  transform-origin: center center; /* Ensure rotation happens from center */
+}
+
+.image-viewer-image:active {
+  cursor: grabbing;
+}
+
+.image-viewer-controls-container {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.image-viewer-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 25px;
+  height: 50px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.drawing-controls {
+  background: rgba(50, 50, 150, 0.8);
+  border: 1px solid rgba(100, 100, 255, 0.2);
+}
+
+.main-controls {
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.image-viewer-control-btn {
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  min-width: 40px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.image-viewer-control-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.image-viewer-control-btn svg {
+  opacity: 0.9;
+  transition: opacity 0.15s ease;
+}
+
+.image-viewer-control-btn:hover svg {
+  opacity: 1;
+}
+
+.image-viewer-notice {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  padding: 10px 15px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  font-size: 14px;
+}
+
+/* Dark theme adjustments */
+.theme-dark .image-viewer-container {
+  background: #1a1a1a;
+}
+
+/* Resize handles */
+.image-viewer-resize-handle {
+  position: absolute;
+  background: transparent;
+  z-index: 1001;
+}
+
+.image-viewer-resize-handle.corner-se {
+  bottom: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  cursor: se-resize;
+}
+
+.image-viewer-resize-handle.corner-sw {
+  bottom: 0;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  cursor: sw-resize;
+}
+
+.image-viewer-resize-handle.corner-ne {
+  top: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  cursor: ne-resize;
+}
+
+.image-viewer-resize-handle.corner-nw {
+  top: 0;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  cursor: nw-resize;
+}
+
+.image-viewer-resize-handle.edge-n {
+  top: 0;
+  left: 20px;
+  right: 20px;
+  height: 10px;
+  cursor: n-resize;
+}
+
+.image-viewer-resize-handle.edge-s {
+  bottom: 0;
+  left: 20px;
+  right: 20px;
+  height: 10px;
+  cursor: s-resize;
+}
+
+.image-viewer-resize-handle.edge-e {
+  top: 20px;
+  bottom: 20px;
+  right: 0;
+  width: 10px;
+  cursor: e-resize;
+}
+
+.image-viewer-resize-handle.edge-w {
+  top: 20px;
+  bottom: 20px;
+  left: 0;
+  width: 10px;
+  cursor: w-resize;
+}
+
+/* Resize handle visual indicators */
+.image-viewer-resize-handle.corner-se::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-bottom: 12px solid var(--background-modifier-border);
+}
+
+/* Keyboard shortcut tooltips */
+
+.image-viewer-control-btn[data-shortcut]:hover::after {
+  content: attr(data-shortcut);
+  position: absolute;
+  bottom: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 1002;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  min-width: 20px;
+  text-align: center;
+}
+
+.image-viewer-control-btn[data-shortcut]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: 45px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.9);
+  z-index: 1002;
+  pointer-events: none;
+}
+
+/* Responsive design */
+/* Drawing canvas overlay */
+.image-viewer-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Cursor styles for different modes */
+.image-viewer-container.text-mode {
+  cursor: text !important;
+}
+
+.image-viewer-container.text-mode * {
+  cursor: text !important;
+}
+
+.image-viewer-container.draw-mode {
+  cursor: crosshair !important;
+}
+
+.image-viewer-container.draw-mode * {
+  cursor: crosshair !important;
+}
+
+.image-viewer-container.erase-mode {
+  cursor: crosshair !important;
+}
+
+.image-viewer-container.erase-mode * {
+  cursor: crosshair !important;
+}
+
+/* Drawing mode active button state */
+.image-viewer-control-btn.active {
+  background: rgba(255, 255, 255, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+/* Drawing settings panel */
+.drawing-settings-panel {
+  position: fixed;
+  top: 30px;
+  right: 30px;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 16px;
+  z-index: 1002;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-width: 200px;
+}
+
+.drawing-settings-panel .setting-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.drawing-settings-panel .setting-group:last-child {
+  margin-bottom: 0;
+}
+
+.drawing-settings-panel label {
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 50px;
+}
+
+.drawing-settings-panel .color-picker {
+  width: 40px;
+  height: 30px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+}
+
+.drawing-settings-panel .width-slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  outline: none;
+  cursor: pointer;
+}
+
+.drawing-settings-panel .width-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.drawing-settings-panel .width-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.drawing-settings-panel .width-value {
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 30px;
+  text-align: center;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .image-viewer-modal .modal-content {
+    width: 100vw;
+    height: 100vh;
+    resize: none;
+  }
+  
+  .image-viewer-resize-handle {
+    display: none;
+  }
+  
+  .image-viewer-controls {
+    padding: 12px;
+    height: 60px;
+  }
+  
+  .image-viewer-control-btn {
+    padding: 12px 16px;
+    font-size: 20px;
+    min-width: 50px;
+    height: 44px;
+  }
+}
+
+/* Inline text input styling */
+.image-viewer-inline-text-input {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 2px dashed #ff0000 !important;
+  border-radius: 4px !important;
+  padding: 4px 8px !important;
+  font-size: 16px !important;
+  font-family: Arial, sans-serif !important;
+  min-width: 100px !important;
+  outline: none !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+  z-index: 1001 !important;
+  transition: all 0.2s ease !important;
+}
+
+.image-viewer-inline-text-input:focus {
+  background: rgba(255, 255, 255, 1) !important;
+  border-color: #ff4444 !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+  transform: scale(1.05) !important;
+}
