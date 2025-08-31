@@ -1,0 +1,14 @@
+{
+  "scripts": {
+    "test": "playwright test",
+    "test:demo": "playwright test demo-recording.spec.ts --project=demo-recording",
+    "test:plugin": "playwright test obsidian-plugin.spec.ts --project=obsidian-electron", 
+    "demo:generate": "node scripts/generate-demo.js",
+    "demo:install": "npm install --save-dev @playwright/test && npx playwright install",
+    "demo:setup": "npm run demo:install && mkdir -p demos tests/videos tests/screenshots",
+    "demo:quick": "npm run test:demo && npm run demo:generate"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}

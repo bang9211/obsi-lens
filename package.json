@@ -6,17 +6,31 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-    "version": "node version-bump.mjs && git add manifest.json versions.json"
+    "version": "node version-bump.mjs && git add manifest.json versions.json",
+    "test": "playwright test",
+    "test:functional": "playwright test --project=obsidian-functional-tests",
+    "test:accessibility": "playwright test --project=accessibility-tests",
+    "test:demo": "playwright test --project=demo-recording",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:report": "playwright show-report",
+    "test:install": "playwright install --with-deps",
+    "demo:gif": "./scripts/generate-gif.sh",
+    "demo:screenshots": "playwright test tests/demo-recording.spec.ts --project=demo-recording --grep=\"record full feature demo\""
   },
   "keywords": [],
   "author": "YT Han",
   "license": "MIT",
   "devDependencies": {
+    "@axe-core/playwright": "^4.8.2",
+    "@playwright/test": "^1.55.0",
     "@types/node": "^16.11.6",
     "@typescript-eslint/eslint-plugin": "5.29.0",
     "@typescript-eslint/parser": "5.29.0",
     "builtin-modules": "3.3.0",
     "esbuild": "0.17.3",
+    "ffmpeg-static": "^5.2.0",
+    "fs-extra": "^11.1.1",
     "obsidian": "latest",
     "tslib": "2.4.0",
     "typescript": "4.7.4"

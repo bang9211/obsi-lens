@@ -15,6 +15,11 @@
     ]
   },
   "include": [
-    "**/*.ts"
+    "main.ts"
+  ],
+  "exclude": [
+    "tests/**/*",
+    "**/*.spec.ts",
+    "**/*.test.ts"
   ]
 }

@@ -15,8 +15,9 @@ A powerful Obsidian plugin that transforms your image viewing experience with si
 - **Drawing Mode**: Draw freely on images with customizable colors and line width
 - **Text Mode**: Add text annotations directly onto images with real-time preview
 - **Eraser Mode**: Remove unwanted drawings or annotations with precision
+- **Crop Tool**: Professional image cropping with resize handles and real-time preview
 - **Clear All**: Quickly clear all drawings and annotations
-- **Undo/Redo System**: Full undo/redo support with 50-step history
+- **Undo/Redo System**: Full undo/redo support with 50-step history for all operations
 - **Drawing Settings Panel**: Real-time color picker and line width adjustment
 - **Scale-Aware Drawing**: Drawing quality maintained at all zoom levels
 
@@ -42,6 +43,13 @@ A powerful Obsidian plugin that transforms your image viewing experience with si
 ### Drawing Tools in Action
 ![Drawing Tools](image_sample2.png)
 *Drawing mode with color customization and text annotations*
+
+### Professional Image Cropping
+![Image Cropping - Selection](image_crop1.png)
+*Crop mode with resize handles and real-time preview overlay*
+
+![Image Cropping - Result](image_crop2.png)
+*Precise cropping with intelligent coordinate adjustment*
 
 ### Advanced Annotations
 ![Advanced Annotations](image_sample3.png)
@@ -79,9 +87,8 @@ A powerful Obsidian plugin that transforms your image viewing experience with si
 |----------|--------|
 | `W` | Toggle drawing mode |
 | `T` | Toggle text mode |
-| `E` | Toggle eraser mode |
-| `D` | Clear all drawings |
-| `Ctrl+Z` / `Cmd+Z` | Undo last action |
+| `C` | Toggle crop mode |
+| `Enter` | Apply crop (when in crop mode) |
 | `Ctrl+Shift+Z` / `Cmd+Shift+Z` | Redo last action |
 
 ### Copy & Export
@@ -106,7 +113,9 @@ Customize the plugin behavior with these settings:
 - **Quick Access**: Right-click any image → "Enhanced Image Viewer"
 - **Multi-Image Browsing**: Use ↑/↓ arrows to navigate between document images
 - **Perfect Copies**: Drawings and rotations are automatically included when copying
-- **Undo Everything**: Ctrl+Z works for all drawing operations
+- **Professional Cropping**: Use 'C' to activate crop mode with resize handles and live preview
+- **Precise Crop Control**: Drag handles to resize, drag inside to move, Enter to apply
+- **Undo Everything**: Ctrl+Z works for all operations including cropping
 - **Text Rotation**: Text added on rotated images stays readable
 - **Scale Independence**: Drawing quality is preserved at all zoom levels
 
@@ -156,9 +165,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🌟 What Makes It Special?
 
 - **🎨 Simple Drawing Tools**: Full-featured drawing system with undo/redo
+- **✂️ Professional Cropping**: Handle-based cropping with real-time preview and smart cursors
 - **🔄 Smart Copy Function**: Automatically preserves drawings and rotations  
 - **📱 Multi-Image Navigation**: Seamlessly browse document images
 - **⚡ High Performance**: Optimized canvas rendering for smooth interactions
 - **🎯 Intelligent Features**: Scale-aware drawing, real-time previews, and more
 
-*Obsi-Lens transforms Obsidian into a powerful image annotation platform with simple-grade tools and intelligent automation.*
+*Obsi-Lens transforms Obsidian into a powerful image editing platform with professional cropping, drawing tools, and intelligent automation.*

@@ -20,5 +20,44 @@ yarn-error.log*
 # Optional npm cache directory
 .npm
 
-.claude
-.serena
+# Playwright Test Results
+test-results/
+playwright-report/
+tests/screenshots/
+tests/videos/
+
+# Test Vault (generated during tests)
+test-vault/
+
+# Demo files that are auto-generated
+demos/*.gif
+demos/demo-trace.zip
+demos/*palette*.png
+
+# Claude AI files
+.claude/
+CLAUDE.md
+.serena/
+claudedocs/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# OS generated files
+Thumbs.db
+*.swp
+*.swo
+
+# Coverage reports
+coverage/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+.playwright-mcp
