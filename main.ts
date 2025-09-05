@@ -1,17 +1,15 @@
-import { App, Plugin, Modal, TFile, Setting } from 'obsidian';
+import { App, Plugin, Modal } from 'obsidian';
 
 interface ImageViewerSettings {
 	showCopyButton: boolean;
 	enableKeyboardShortcuts: boolean;
 	zoomIncrement: number;
-	syncModalSize: boolean;
 }
 
 const DEFAULT_SETTINGS: ImageViewerSettings = {
 	showCopyButton: true,
 	enableKeyboardShortcuts: true,
-	zoomIncrement: 0.2,
-	syncModalSize: true
+	zoomIncrement: 0.2
 }
 
 // Inline text editor for real-time text input on canvas
@@ -141,6 +139,12 @@ class ImageViewerModal extends Modal {
 	private imageElement: HTMLImageElement;
 	private containerElement: HTMLElement;
 	private isResizing: boolean = false;
+	
+	// Bound event handlers to fix removeEventListener issues
+	private boundHandleResize: (e: MouseEvent) => void;
+	private boundStopResize: (e: MouseEvent) => void;
+	private boundHandleDrag: (e: MouseEvent) => void;
+	private boundStopDrag: (e: MouseEvent) => void;
 	private isDragging: boolean = false;
 	private originalImageWidth: number = 0;
 	private originalImageHeight: number = 0;
@@ -168,7 +172,6 @@ class ImageViewerModal extends Modal {
 		color: string;
 		lineWidth: number;
 		font?: string;
-		rotation?: number; // Store rotation when text was created (deprecated)
 		creationRotation?: number; // Store rotation when text was created
 	}> = [];
 	private currentDrawing: {
@@ -180,7 +183,6 @@ class ImageViewerModal extends Modal {
 		color: string;
 		lineWidth: number;
 		font?: string;
-		rotation?: number;
 		creationRotation?: number;
 	} | null = null;
 	
@@ -188,7 +190,6 @@ class ImageViewerModal extends Modal {
 	private textInputElement: HTMLInputElement | null = null;
 	private isEditingText: boolean = false;
 	private textEditPosition: { x: number, y: number } | null = null;
-	private currentTextElement: any | null = null;
 	
 	// Undo/Redo functionality
 	private undoStack: Array<any> = [];
@@ -233,6 +234,12 @@ class ImageViewerModal extends Modal {
 		this.settings = settings;
 		this.sourceDocument = sourceDocument || document;
 		// Don't call findAllImages here - it's now async and will be called from onOpen
+		
+		// Bind event handlers to maintain proper 'this' context
+		this.boundHandleResize = this.handleResize.bind(this);
+		this.boundStopResize = this.stopResize.bind(this);
+		this.boundHandleDrag = this.handleDrag.bind(this);
+		this.boundStopDrag = this.stopDrag.bind(this);
 	}
 
 	private async findAllImages() {
@@ -588,7 +595,7 @@ class ImageViewerModal extends Modal {
 		// Rotation buttons
 		const rotateLeftBtn = controls.createEl('button', {
 			cls: 'image-viewer-control-btn rotate-left-btn',
-			title: 'Rotate Left (← or Q)'
+			title: 'Rotate Left (←)'
 		});
 		rotateLeftBtn.setAttribute('data-shortcut', '←');
 		rotateLeftBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"></path></svg>`;
@@ -683,8 +690,8 @@ class ImageViewerModal extends Modal {
 		};
 
 		// Use the source document for event listeners to handle popout windows correctly
-		this.sourceDocument.addEventListener('mousemove', this.handleResize.bind(this));
-		this.sourceDocument.addEventListener('mouseup', this.stopResize.bind(this));
+		this.sourceDocument.addEventListener('mousemove', this.boundHandleResize);
+		this.sourceDocument.addEventListener('mouseup', this.boundStopResize);
 		
 		modalContent.style.userSelect = 'none';
 	}
@@ -756,8 +763,8 @@ class ImageViewerModal extends Modal {
 		this.resizeData = null;
 		
 		// Remove event listeners from the correct document
-		this.sourceDocument.removeEventListener('mousemove', this.handleResize.bind(this));
-		this.sourceDocument.removeEventListener('mouseup', this.stopResize.bind(this));
+		this.sourceDocument.removeEventListener('mousemove', this.boundHandleResize);
+		this.sourceDocument.removeEventListener('mouseup', this.boundStopResize);
 		
 		const modalContent = this.contentEl;
 		modalContent.style.userSelect = '';
@@ -987,8 +994,8 @@ class ImageViewerModal extends Modal {
 		};
 
 		// Use the source document for event listeners to handle popout windows correctly
-		this.sourceDocument.addEventListener('mousemove', this.handleDrag.bind(this));
-		this.sourceDocument.addEventListener('mouseup', this.stopDrag.bind(this));
+		this.sourceDocument.addEventListener('mousemove', this.boundHandleDrag);
+		this.sourceDocument.addEventListener('mouseup', this.boundStopDrag);
 		
 		this.imageElement.style.cursor = 'grabbing';
 	}
@@ -1010,8 +1017,8 @@ class ImageViewerModal extends Modal {
 		this.dragData = null;
 		
 		// Remove event listeners from the correct document
-		this.sourceDocument.removeEventListener('mousemove', this.handleDrag.bind(this));
-		this.sourceDocument.removeEventListener('mouseup', this.stopDrag.bind(this));
+		this.sourceDocument.removeEventListener('mousemove', this.boundHandleDrag);
+		this.sourceDocument.removeEventListener('mouseup', this.boundStopDrag);
 		
 		this.imageElement.style.cursor = 'grab';
 	}
@@ -1031,10 +1038,6 @@ class ImageViewerModal extends Modal {
 	});
 }
 	
-	private updateCanvasTransform() {
-		// Use the full sync method to ensure proper canvas setup
-		this.syncCanvasWithImage();
-	}
 
 	private setInitialModalSize() {
 		if (this.originalImageWidth === 0 || this.originalImageHeight === 0) return;
@@ -1366,13 +1369,36 @@ class ImageViewerModal extends Modal {
 		return null;
 	}
 	
-	// Convert from canvas CSS coordinates to canvas internal coordinates
-	// Since canvas internal dimensions now match visual layout, this is straightforward
-	const scaleX = this.canvasElement.width / canvasRect.width;
-	const scaleY = this.canvasElement.height / canvasRect.height;
+	// Convert mouse coordinates to image natural coordinate space
+	// Account for image scaling and current display size
+	const scaleX = naturalWidth / canvasRect.width;
+	const scaleY = naturalHeight / canvasRect.height;
 	
-	const canvasX = mouseX * scaleX;
-	const canvasY = mouseY * scaleY;
+	// Map mouse position to natural image coordinates
+	const imageX = mouseX * scaleX;
+	const imageY = mouseY * scaleY;
+	
+	// Apply inverse transformation to get original drawing coordinates
+	// This accounts for image rotation and returns coordinates in original image space
+	let canvasX = imageX;
+	let canvasY = imageY;
+	
+	// Apply inverse rotation transformation
+	const rotation = this.currentRotation % 360;
+	if (rotation === 90) {
+		// Inverse of 90° clockwise: (x, y) -> (y, naturalWidth - x)
+		canvasX = imageY;
+		canvasY = naturalWidth - imageX;
+	} else if (rotation === 270) {
+		// Inverse of 270° clockwise: (x, y) -> (naturalHeight - y, x)
+		canvasX = naturalHeight - imageY;
+		canvasY = imageX;
+	} else if (rotation === 180) {
+		// Inverse of 180°: (x, y) -> (naturalWidth - x, naturalHeight - y)
+		canvasX = naturalWidth - imageX;
+		canvasY = naturalHeight - imageY;
+	}
+	// For 0° rotation, no transformation needed
 	
 	return { x: canvasX, y: canvasY };
 }
@@ -1387,22 +1413,12 @@ class ImageViewerModal extends Modal {
 	const imageRect = this.imageElement.getBoundingClientRect();
 	const containerRect = this.containerElement.getBoundingClientRect();
 	
-	// Determine rotation state (currentRotation is already normalized to 0-360)
-	const rotation = this.currentRotation;
-	const isRotated90or270 = rotation === 90 || rotation === 270;
+	// Canvas Independent Management: Only follow image position/size, not transforms
+	// Set canvas internal dimensions to match image natural size for proper drawing coordinate space
+	this.canvasElement.width = naturalWidth;
+	this.canvasElement.height = naturalHeight;
 	
-	// Set canvas internal dimensions to match visual layout
-	if (isRotated90or270) {
-		// 90도/270도 회전 시: 내부 크기도 회전 적용
-		this.canvasElement.width = naturalHeight;
-		this.canvasElement.height = naturalWidth;
-	} else {
-		// 0도/180도 회전 시: 원본 크기 유지
-		this.canvasElement.width = naturalWidth;
-		this.canvasElement.height = naturalHeight;
-	}
-	
-	// Canvas CSS size and position should exactly match the rotated image
+	// Canvas CSS size matches image's current visual size
 	this.canvasElement.style.width = imageRect.width + 'px';
 	this.canvasElement.style.height = imageRect.height + 'px';
 	
@@ -1414,12 +1430,12 @@ class ImageViewerModal extends Modal {
 	this.canvasElement.style.left = left + 'px';
 	this.canvasElement.style.top = top + 'px';
 	
-	// IMPORTANT: Do NOT apply rotation transform to canvas
-	// Canvas should align with the already-rotated image position
-	this.canvasElement.style.transform = `translate(${this.imageOffsetX}px, ${this.imageOffsetY}px)`;
+	// NO CSS transform on canvas - let internal coordinate transformation handle drawing
+	// Canvas follows image position/size only, drawing elements use internal transformation
+	this.canvasElement.style.transform = 'none';
 	this.canvasElement.style.transformOrigin = 'center center';
 	
-	// Redraw all elements
+	// Redraw all elements with internal coordinate transformation
 	this.redrawAllElements();
 	
 	this.canvasElement.style.pointerEvents = (this.currentMode === 'draw' || this.currentMode === 'text' || this.currentMode === 'erase') ? 'auto' : 'none';
@@ -2400,13 +2416,8 @@ class ImageViewerModal extends Modal {
 	const naturalWidth = this.originalImageWidth || this.imageElement.naturalWidth;
 	const naturalHeight = this.originalImageHeight || this.imageElement.naturalHeight;
 	
-	// Determine current rotation state (currentRotation is already normalized)
+	// Get rotation state for coordinate transformation
 	const rotation = this.currentRotation;
-	const isRotated90or270 = rotation === 90 || rotation === 270;
-	
-	// Get current canvas dimensions (already rotated if needed)
-	const canvasWidth = this.canvasElement.width;
-	const canvasHeight = this.canvasElement.height;
 	
 	// Draw elements with coordinate transformation if needed
 	for (const element of this.drawingElements) {
