@@ -159,27 +159,35 @@ class ImageViewerModal extends Modal {
 	private canvasContext: CanvasRenderingContext2D;
 	private isDrawing: boolean = false;
 	private isErasing: boolean = false;
-	private currentMode: 'view' | 'draw' | 'text' | 'erase' | 'crop' = 'view';
+	private currentMode: 'view' | 'draw' | 'text' | 'erase' | 'crop' | 'square' = 'view';
 	private drawingColor: string = '#ff0000';
 	private drawingLineWidth: number = 3;
 	private lastDrawPoint: { x: number, y: number } | null = null;
 	private drawingElements: Array<{
-		type: 'line' | 'text';
+		type: 'line' | 'text' | 'square';
 		points?: Array<{ x: number, y: number }>;
 		text?: string;
 		x?: number;
 		y?: number;
+		startX?: number;
+		startY?: number;
+		endX?: number;
+		endY?: number;
 		color: string;
 		lineWidth: number;
 		font?: string;
 		creationRotation?: number; // Store rotation when text was created
 	}> = [];
 	private currentDrawing: {
-		type: 'line' | 'text';
+		type: 'line' | 'text' | 'square';
 		points?: Array<{ x: number, y: number }>;
 		text?: string;
 		x?: number;
 		y?: number;
+		startX?: number;
+		startY?: number;
+		endX?: number;
+		endY?: number;
 		color: string;
 		lineWidth: number;
 		font?: string;
@@ -190,6 +198,10 @@ class ImageViewerModal extends Modal {
 	private textInputElement: HTMLInputElement | null = null;
 	private isEditingText: boolean = false;
 	private textEditPosition: { x: number, y: number } | null = null;
+	
+	// Square drawing properties
+	private isDrawingSquare: boolean = false;
+	private squareStartPoint: { x: number, y: number } | null = null;
 	
 	// Undo/Redo functionality
 	private undoStack: Array<any> = [];
@@ -534,6 +546,14 @@ class ImageViewerModal extends Modal {
 		clearButton.setAttribute('data-shortcut', 'D');
 		clearButton.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"></polyline><path d="M19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>`;
 		clearButton.addEventListener('click', () => this.clearDrawing());
+		
+		const squareButton = drawingControls.createEl('button', {
+			cls: 'image-viewer-control-btn square-btn',
+			title: 'Square Mode (S)'
+		});
+		squareButton.setAttribute('data-shortcut', 'S');
+		squareButton.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>`;
+		squareButton.addEventListener('click', () => this.toggleSquareMode());
 		
 		const cropButton = drawingControls.createEl('button', {
 			cls: 'image-viewer-control-btn crop-btn',
@@ -890,6 +910,11 @@ class ImageViewerModal extends Modal {
 				this.toggleCropMode();
 			});
 			
+			this.scope.register([], 's', () => {
+				if (this.isEditingText) return;
+				this.toggleSquareMode();
+			});
+			
 			// Crop mode shortcuts
 			this.scope.register([], 'Enter', () => {
 				if (this.currentMode === 'crop' && this.cropData.isActive) {
@@ -1179,7 +1204,7 @@ class ImageViewerModal extends Modal {
 
 	private async copyImageWithDrawing() {
 		try {
-			// Create an offscreen canvas to render the final image
+			// Create an offscreen canvas matching the rotated image dimensions
 			const offscreenCanvas = document.createElement('canvas');
 			const offscreenContext = offscreenCanvas.getContext('2d');
 			
@@ -1190,7 +1215,7 @@ class ImageViewerModal extends Modal {
 			// Get original image dimensions
 			const naturalWidth = this.originalImageWidth || this.imageElement.naturalWidth;
 			const naturalHeight = this.originalImageHeight || this.imageElement.naturalHeight;
-			const rotation = this.currentRotation; // Already normalized to 0-360
+			const rotation = this.currentRotation;
 			const isRotated90or270 = rotation === 90 || rotation === 270;
 			
 			// Set canvas size based on rotation (final output dimensions)
@@ -1208,63 +1233,45 @@ class ImageViewerModal extends Modal {
 			offscreenContext.imageSmoothingEnabled = true;
 			offscreenContext.imageSmoothingQuality = 'high';
 
-			// Save context state
-			offscreenContext.save();
-			
-			// Apply rotation transform to the entire canvas
-			if (this.currentRotation !== 0) {
-				// Move to center for rotation
-				offscreenContext.translate(offscreenCanvas.width / 2, offscreenCanvas.height / 2);
-				offscreenContext.rotate((this.currentRotation * Math.PI) / 180);
-				offscreenContext.translate(-naturalWidth / 2, -naturalHeight / 2);
-			}
-
-			// Draw the original image
+			// Draw the original image with the same rotation approach as drawings
 			const img = new Image();
-			img.crossOrigin = 'anonymous'; // Handle CORS if needed
+			img.crossOrigin = 'anonymous';
 			
 			await new Promise<void>((resolve, reject) => {
 				img.onload = () => {
-					// Draw image at natural size
-					offscreenContext.drawImage(img, 0, 0, naturalWidth, naturalHeight);
+					// Apply the same rotation transform as the drawing canvas
+					offscreenContext.save();
+					offscreenContext.translate(offscreenCanvas.width / 2, offscreenCanvas.height / 2);
+					if (rotation !== 0) {
+						offscreenContext.rotate((rotation * Math.PI) / 180);
+					}
+					
+					// Draw image centered and scaled to match the rotated output size
+					if (isRotated90or270) {
+						// For 90/270 degree rotations, we need to account for swapped dimensions
+						offscreenContext.drawImage(img, -naturalWidth / 2, -naturalHeight / 2, naturalWidth, naturalHeight);
+					} else {
+						// For 0/180 degrees
+						offscreenContext.drawImage(img, -naturalWidth / 2, -naturalHeight / 2, naturalWidth, naturalHeight);
+					}
+					
+					offscreenContext.restore();
 					resolve();
 				};
 				img.onerror = reject;
 				img.src = this.imageSrc;
 			});
-
-			// Draw all drawing elements on top (원본 좌표로)
-			for (const element of this.drawingElements) {
-				if (element.type === 'line' && element.points && element.points.length > 1) {
-					offscreenContext.beginPath();
-					offscreenContext.strokeStyle = element.color;
-					offscreenContext.lineWidth = element.lineWidth;
-					offscreenContext.lineCap = 'round';
-					offscreenContext.lineJoin = 'round';
-					
-					const firstPoint = element.points[0];
-					offscreenContext.moveTo(firstPoint.x, firstPoint.y);
-					
-					for (let i = 1; i < element.points.length; i++) {
-						const point = element.points[i];
-						offscreenContext.lineTo(point.x, point.y);
-					}
-					offscreenContext.stroke();
-					
-				} else if (element.type === 'text' && element.text && element.x !== undefined && element.y !== undefined) {
-					const fontSize = parseInt((element.font || '16px Arial').split('px')[0]) || 16;
-					offscreenContext.font = `${fontSize}px Arial`;
-					offscreenContext.fillStyle = element.color;
-					
-					// Draw text at original position (캔버스 전체 회전이 이미 적용됨)
-					offscreenContext.fillText(element.text, element.x, element.y);
-				}
-			}
-
-			// Restore the main context
+			
+			// Draw the drawing canvas on top with the same rotation approach
+			const scaleX = offscreenCanvas.width / this.canvasElement.width;
+			const scaleY = offscreenCanvas.height / this.canvasElement.height;
+			
+			offscreenContext.save();
+			offscreenContext.scale(scaleX, scaleY);
+			offscreenContext.drawImage(this.canvasElement, 0, 0);
 			offscreenContext.restore();
 
-			// Convert canvas to blob
+			// Convert to blob
 			const blob = await new Promise<Blob>((resolve, reject) => {
 				offscreenCanvas.toBlob((blob) => {
 					if (blob) {
@@ -1350,6 +1357,23 @@ class ImageViewerModal extends Modal {
 
 	// Drawing-related methods
 	
+	// Helper method to transform coordinates for rotation
+	private transformPointForRotation(point: { x: number, y: number }, rotation: number, naturalWidth: number, naturalHeight: number): { x: number, y: number } {
+		if (rotation === 90) {
+			// 90도 시계방향 회전: (x, y) -> (naturalHeight - y, x)
+			return { x: naturalHeight - point.y, y: point.x };
+		} else if (rotation === 270) {
+			// 270도 시계방향 회전: (x, y) -> (y, naturalWidth - x)
+			return { x: point.y, y: naturalWidth - point.x };
+		} else if (rotation === 180) {
+			// 180도 회전: (x, y) -> (naturalWidth - x, naturalHeight - y)
+			return { x: naturalWidth - point.x, y: naturalHeight - point.y };
+		} else {
+			// 0도 회전: 변환 없음
+			return point;
+		}
+	}
+	
 	// Helper method to convert mouse coordinates to canvas-relative coordinates
 	private getCanvasCoordinates(e: MouseEvent): { x: number, y: number } | null {
 	const naturalWidth = this.originalImageWidth || this.imageElement.naturalWidth;
@@ -1370,9 +1394,20 @@ class ImageViewerModal extends Modal {
 	}
 	
 	// Convert mouse coordinates to image natural coordinate space
-	// Account for image scaling and current display size
-	const scaleX = naturalWidth / canvasRect.width;
-	const scaleY = naturalHeight / canvasRect.height;
+	// Account for rotation state when calculating scale factors
+	const rotation = this.currentRotation % 360;
+	const isRotated90or270 = rotation === 90 || rotation === 270;
+	
+	let scaleX: number, scaleY: number;
+	if (isRotated90or270) {
+		// For 90°/270° rotation, image dimensions are swapped in display
+		scaleX = naturalHeight / canvasRect.width;
+		scaleY = naturalWidth / canvasRect.height;
+	} else {
+		// For 0°/180° rotation, use original dimensions
+		scaleX = naturalWidth / canvasRect.width;
+		scaleY = naturalHeight / canvasRect.height;
+	}
 	
 	// Map mouse position to natural image coordinates
 	const imageX = mouseX * scaleX;
@@ -1383,15 +1418,14 @@ class ImageViewerModal extends Modal {
 	let canvasX = imageX;
 	let canvasY = imageY;
 	
-	// Apply inverse rotation transformation
-	const rotation = this.currentRotation % 360;
+	// Apply inverse rotation transformation (reuse rotation variable from above)
 	if (rotation === 90) {
-		// Inverse of 90° clockwise: (x, y) -> (y, naturalWidth - x)
+		// Inverse of 90° clockwise: (x, y) -> (y, naturalHeight - x)
 		canvasX = imageY;
-		canvasY = naturalWidth - imageX;
+		canvasY = naturalHeight - imageX;
 	} else if (rotation === 270) {
-		// Inverse of 270° clockwise: (x, y) -> (naturalHeight - y, x)
-		canvasX = naturalHeight - imageY;
+		// Inverse of 270° clockwise: (x, y) -> (naturalWidth - y, x)
+		canvasX = naturalWidth - imageY;
 		canvasY = imageX;
 	} else if (rotation === 180) {
 		// Inverse of 180°: (x, y) -> (naturalWidth - x, naturalHeight - y)
@@ -1400,7 +1434,74 @@ class ImageViewerModal extends Modal {
 	}
 	// For 0° rotation, no transformation needed
 	
+	// Validate transformed coordinates are within original image bounds
+	// Always use original image dimensions regardless of rotation
+	if (canvasX < 0 || canvasY < 0 || canvasX > naturalWidth || canvasY > naturalHeight) {
+		console.log(`Coordinates out of bounds: (${canvasX}, ${canvasY}) for image (${naturalWidth}x${naturalHeight})`);
+		return null;
+	}
+	
 	return { x: canvasX, y: canvasY };
+}
+
+	// Helper method to convert canvas coordinates back to screen coordinates
+	private canvasToScreenCoordinates(canvasX: number, canvasY: number): { x: number, y: number } | null {
+	const naturalWidth = this.originalImageWidth || this.imageElement.naturalWidth;
+	const naturalHeight = this.originalImageHeight || this.imageElement.naturalHeight;
+	
+	if (!naturalWidth || !naturalHeight) return null;
+	
+	// Get canvas element position and size
+	const canvasRect = this.canvasElement.getBoundingClientRect();
+	
+	// Validate input coordinates are within original image bounds
+	const rotation = this.currentRotation % 360;
+	const isRotated90or270 = rotation === 90 || rotation === 270;
+	
+	if (canvasX < 0 || canvasY < 0 || canvasX > naturalWidth || canvasY > naturalHeight) {
+		return null;
+	}
+	
+	// Apply rotation transformation to convert canvas coordinates to image display coordinates
+	let imageX = canvasX;
+	let imageY = canvasY;
+	
+	// Apply rotation transformation (forward transformation)
+	if (rotation === 90) {
+		// 90° clockwise: (x, y) -> (naturalHeight - y, x)
+		imageX = naturalHeight - canvasY;
+		imageY = canvasX;
+	} else if (rotation === 180) {
+		// 180°: (x, y) -> (naturalWidth - x, naturalHeight - y)
+		imageX = naturalWidth - canvasX;
+		imageY = naturalHeight - canvasY;
+	} else if (rotation === 270) {
+		// 270° clockwise: (x, y) -> (y, naturalWidth - x)
+		imageX = canvasY;
+		imageY = naturalWidth - canvasX;
+	}
+	// For 0° rotation, no transformation needed
+	
+	// Convert image coordinates to screen coordinates
+	// Account for rotation state when calculating scale factors
+	// (isRotated90or270 already declared above for boundary validation)
+	
+	let scaleX: number, scaleY: number;
+	if (isRotated90or270) {
+		// For 90°/270° rotation, image dimensions are swapped in display
+		scaleX = canvasRect.width / naturalHeight;
+		scaleY = canvasRect.height / naturalWidth;
+	} else {
+		// For 0°/180° rotation, use original dimensions
+		scaleX = canvasRect.width / naturalWidth;
+		scaleY = canvasRect.height / naturalHeight;
+	}
+	
+	// Map image coordinates to screen position
+	const screenX = imageX * scaleX + canvasRect.left;
+	const screenY = imageY * scaleY + canvasRect.top;
+	
+	return { x: screenX, y: screenY };
 }
 	
 	private syncCanvasWithImage() {
@@ -1413,10 +1514,20 @@ class ImageViewerModal extends Modal {
 	const imageRect = this.imageElement.getBoundingClientRect();
 	const containerRect = this.containerElement.getBoundingClientRect();
 	
-	// Canvas Independent Management: Only follow image position/size, not transforms
-	// Set canvas internal dimensions to match image natural size for proper drawing coordinate space
-	this.canvasElement.width = naturalWidth;
-	this.canvasElement.height = naturalHeight;
+	// Canvas Independent Management: Set canvas internal dimensions based on rotation
+	// For 90°/270° rotation, swap width/height to maintain proper aspect ratio
+	const rotation = this.currentRotation % 360;
+	const isRotated90or270 = rotation === 90 || rotation === 270;
+	
+	if (isRotated90or270) {
+		// Rotated 90°/270°: swap dimensions to match rotated image aspect ratio
+		this.canvasElement.width = naturalHeight;
+		this.canvasElement.height = naturalWidth;
+	} else {
+		// 0°/180°: use original dimensions
+		this.canvasElement.width = naturalWidth;
+		this.canvasElement.height = naturalHeight;
+	}
 	
 	// Canvas CSS size matches image's current visual size
 	this.canvasElement.style.width = imageRect.width + 'px';
@@ -1451,6 +1562,11 @@ class ImageViewerModal extends Modal {
 		this.updateModeUI();
 	}
 
+	private toggleSquareMode() {
+		this.currentMode = this.currentMode === 'square' ? 'view' : 'square';
+		this.updateModeUI();
+	}
+	
 	private toggleCropMode() {
 		if (this.currentMode === 'crop') {
 			this.cancelCrop();
@@ -1483,16 +1599,18 @@ class ImageViewerModal extends Modal {
 		const drawBtn = this.contentEl.querySelector('.draw-btn') as HTMLButtonElement;
 		const textBtn = this.contentEl.querySelector('.text-btn') as HTMLButtonElement;
 		const eraseBtn = this.contentEl.querySelector('.erase-btn') as HTMLButtonElement;
+		const squareBtn = this.contentEl.querySelector('.square-btn') as HTMLButtonElement;
 		const cropBtn = this.contentEl.querySelector('.crop-btn') as HTMLButtonElement;
 		
 		// Reset all button states
 		drawBtn?.classList.remove('active');
 		textBtn?.classList.remove('active');
 		eraseBtn?.classList.remove('active');
+		squareBtn?.classList.remove('active');
 		cropBtn?.classList.remove('active');
 		
 		// Reset container classes
-		this.containerElement.classList.remove('draw-mode', 'text-mode', 'erase-mode', 'crop-mode');
+		this.containerElement.classList.remove('draw-mode', 'text-mode', 'erase-mode', 'square-mode', 'crop-mode');
 		
 		// Set appropriate cursor for each mode
 		if (this.currentMode === 'draw') {
@@ -1507,6 +1625,10 @@ class ImageViewerModal extends Modal {
 			eraseBtn?.classList.add('active');
 			this.containerElement.classList.add('erase-mode');
 			this.canvasElement.style.cursor = 'crosshair';
+		} else if (this.currentMode === 'square') {
+			squareBtn?.classList.add('active');
+			this.containerElement.classList.add('square-mode');
+			this.canvasElement.style.cursor = 'crosshair';
 		} else if (this.currentMode === 'crop') {
 			cropBtn?.classList.add('active');
 			this.containerElement.classList.add('crop-mode');
@@ -1515,8 +1637,8 @@ class ImageViewerModal extends Modal {
 			this.canvasElement.style.cursor = 'default';
 		}
 		
-		// Update canvas pointer events - allow draw, text, erase, and crop modes
-		this.canvasElement.style.pointerEvents = (this.currentMode === 'draw' || this.currentMode === 'text' || this.currentMode === 'erase' || this.currentMode === 'crop') ? 'auto' : 'none';
+		// Update canvas pointer events - allow draw, text, erase, square, and crop modes
+		this.canvasElement.style.pointerEvents = (this.currentMode === 'draw' || this.currentMode === 'text' || this.currentMode === 'erase' || this.currentMode === 'square' || this.currentMode === 'crop') ? 'auto' : 'none';
 	}
 
 	private setupDrawingEvents() {
@@ -1528,6 +1650,8 @@ class ImageViewerModal extends Modal {
 				this.addTextAtPosition(e);
 			} else if (this.currentMode === 'erase') {
 				this.startErasing(e);
+			} else if (this.currentMode === 'square') {
+				this.startDrawingSquare(e);
 			} else if (this.currentMode === 'crop') {
 				this.startCrop(e);
 			}
@@ -1553,6 +1677,8 @@ class ImageViewerModal extends Modal {
 				this.draw(e);
 			} else if (this.currentMode === 'erase' && this.isErasing) {
 				this.eraseDrawingAtPoint(e);
+			} else if (this.currentMode === 'square' && this.isDrawingSquare) {
+				this.updateSquareDrawing(e);
 			} else if (this.currentMode === 'crop') {
 				this.updateCropCursor(e);
 				this.updateCrop(e);
@@ -1564,6 +1690,8 @@ class ImageViewerModal extends Modal {
 				this.stopDrawing();
 			} else if (this.currentMode === 'erase') {
 				this.stopErasing();
+			} else if (this.currentMode === 'square') {
+				this.finishSquareDrawing();
 			} else if (this.currentMode === 'crop') {
 				this.finishCropSelection();
 			}
@@ -1574,6 +1702,8 @@ class ImageViewerModal extends Modal {
 				this.stopDrawing();
 			} else if (this.currentMode === 'erase') {
 				this.stopErasing();
+			} else if (this.currentMode === 'square') {
+				this.finishSquareDrawing();
 			} else if (this.currentMode === 'crop') {
 				this.finishCropSelection();
 				// Reset cursor when leaving canvas
@@ -1604,9 +1734,14 @@ class ImageViewerModal extends Modal {
 		lineWidth: scaledLineWidth
 	};
 	
-	// Draw on canvas using actual coordinates and scaled line width
+	// Transform coordinates for current rotation when drawing to canvas
+	const naturalWidth = this.originalImageWidth || this.imageElement.naturalWidth;
+	const naturalHeight = this.originalImageHeight || this.imageElement.naturalHeight;
+	const transformedPoint = this.transformPointForRotation({ x, y }, this.currentRotation, naturalWidth, naturalHeight);
+	
+	// Draw on canvas using transformed coordinates and scaled line width
 	this.canvasContext.beginPath();
-	this.canvasContext.moveTo(x, y);
+	this.canvasContext.moveTo(transformedPoint.x, transformedPoint.y);
 	this.canvasContext.lineCap = 'round';
 	this.canvasContext.lineJoin = 'round';
 	this.canvasContext.strokeStyle = this.drawingColor;
@@ -1625,8 +1760,13 @@ class ImageViewerModal extends Modal {
 	// Add point to current drawing
 	this.currentDrawing.points!.push({ x, y });
 	
-	// Draw on canvas using actual coordinates
-	this.canvasContext.lineTo(x, y);
+	// Transform coordinates for current rotation when drawing to canvas
+	const naturalWidth = this.originalImageWidth || this.imageElement.naturalWidth;
+	const naturalHeight = this.originalImageHeight || this.imageElement.naturalHeight;
+	const transformedPoint = this.transformPointForRotation({ x, y }, this.currentRotation, naturalWidth, naturalHeight);
+	
+	// Draw on canvas using transformed coordinates
+	this.canvasContext.lineTo(transformedPoint.x, transformedPoint.y);
 	this.canvasContext.stroke();
 	
 	this.lastDrawPoint = { x, y };
@@ -1657,6 +1797,115 @@ class ImageViewerModal extends Modal {
 
 	private stopErasing() {
 		this.isErasing = false;
+	}
+
+	// Square drawing methods
+	private startDrawingSquare(e: MouseEvent) {
+		this.isDrawingSquare = true;
+		
+		// Get canvas coordinates (already in image pixel space)
+		const coords = this.getCanvasCoordinates(e);
+		if (!coords) return;
+		
+		const { x, y } = coords;
+		
+		this.squareStartPoint = { x, y };
+		
+		// Calculate line width based on current scale to maintain visual consistency
+		const scaledLineWidth = this.drawingLineWidth / this.currentScale;
+		
+		// Start new square drawing element with image pixel coordinates
+		this.currentDrawing = {
+			type: 'square',
+			startX: x,
+			startY: y,
+			endX: x,
+			endY: y,
+			color: this.drawingColor,
+			lineWidth: scaledLineWidth
+		};
+	}
+
+	private updateSquareDrawing(e: MouseEvent) {
+		if (!this.isDrawingSquare || !this.squareStartPoint || !this.currentDrawing) return;
+		
+		// Get canvas coordinates (already in image pixel space)
+		const coords = this.getCanvasCoordinates(e);
+		if (!coords) return;
+		
+		const { x, y } = coords;
+		
+		// Update current drawing end point
+		this.currentDrawing.endX = x;
+		this.currentDrawing.endY = y;
+		
+		// Redraw all elements to show live preview
+		this.redrawAllElements();
+		
+		// Draw preview square
+		this.drawSquarePreview(this.squareStartPoint.x, this.squareStartPoint.y, x, y);
+	}
+
+	private finishSquareDrawing() {
+		if (this.currentDrawing && this.currentDrawing.type === 'square' && this.squareStartPoint) {
+			// Only save if square has some size
+			const width = Math.abs(this.currentDrawing.endX! - this.currentDrawing.startX!);
+			const height = Math.abs(this.currentDrawing.endY! - this.currentDrawing.startY!);
+			
+			if (width > 5 || height > 5) { // Minimum size threshold
+				// Save state to undo stack before adding new drawing
+				this.saveStateToUndoStack();
+				
+				// Save completed square
+				this.drawingElements.push(this.currentDrawing);
+			}
+		}
+		
+		this.isDrawingSquare = false;
+		this.squareStartPoint = null;
+		this.currentDrawing = null;
+		
+		// Redraw to remove preview
+		this.redrawAllElements();
+	}
+
+	private drawSquarePreview(startX: number, startY: number, endX: number, endY: number) {
+		// Get original image dimensions for coordinate transformation
+		const naturalWidth = this.originalImageWidth || this.imageElement.naturalWidth;
+		const naturalHeight = this.originalImageHeight || this.imageElement.naturalHeight;
+		
+		// Transform coordinates for current rotation
+		const transformedStart = this.transformPointForRotation(
+			{ x: startX, y: startY }, 
+			this.currentRotation, 
+			naturalWidth, 
+			naturalHeight
+		);
+		const transformedEnd = this.transformPointForRotation(
+			{ x: endX, y: endY }, 
+			this.currentRotation, 
+			naturalWidth, 
+			naturalHeight
+		);
+		
+		// Calculate line width based on current scale
+		const scaledLineWidth = this.drawingLineWidth / this.currentScale;
+		
+		// Draw preview square on canvas
+		this.canvasContext.save();
+		this.canvasContext.strokeStyle = this.drawingColor;
+		this.canvasContext.lineWidth = scaledLineWidth;
+		this.canvasContext.globalAlpha = 0.7; // Semi-transparent preview
+		
+		// Calculate rectangle dimensions
+		const rectX = Math.min(transformedStart.x, transformedEnd.x);
+		const rectY = Math.min(transformedStart.y, transformedEnd.y);
+		const rectWidth = Math.abs(transformedEnd.x - transformedStart.x);
+		const rectHeight = Math.abs(transformedEnd.y - transformedStart.y);
+		
+		this.canvasContext.strokeRect(rectX, rectY, rectWidth, rectHeight);
+		
+		this.canvasContext.restore();
 	}
 
 	// Crop-related methods
@@ -2090,8 +2339,11 @@ class ImageViewerModal extends Modal {
 	
 	// Position input at clicked location (always horizontal for input)
 	const containerRect = this.containerElement.getBoundingClientRect();
-	const inputLeft = clientX - containerRect.left;
-	const inputTop = clientY - containerRect.top;
+	
+	// Convert canvas coordinates back to screen coordinates to handle rotation properly
+	const screenCoords = this.canvasToScreenCoordinates(canvasX, canvasY);
+	const inputLeft = screenCoords ? screenCoords.x - containerRect.left : clientX - containerRect.left;
+	const inputTop = screenCoords ? screenCoords.y - containerRect.top : clientY - containerRect.top;
 	
 	this.textInputElement.style.position = 'absolute';
 	this.textInputElement.style.left = inputLeft + 'px';
@@ -2164,18 +2416,36 @@ class ImageViewerModal extends Modal {
 		this.canvasContext.fillStyle = this.drawingColor;
 		this.canvasContext.globalAlpha = 0.7; // Semi-transparent preview
 		
+		// Get original image dimensions for coordinate transformation
+		const naturalWidth = this.originalImageWidth || this.imageElement.naturalWidth;
+		const naturalHeight = this.originalImageHeight || this.imageElement.naturalHeight;
+		
+		// Transform text coordinates for current rotation (same as redrawAllElements)
+		let transformedX = this.textEditPosition.x;
+		let transformedY = this.textEditPosition.y;
+		
+		const rotation = this.currentRotation;
+		if (rotation === 90) {
+			// 90도 시계방향 회전: (x, y) -> (naturalHeight - y, x)
+			transformedX = naturalHeight - this.textEditPosition.y;
+			transformedY = this.textEditPosition.x;
+		} else if (rotation === 270) {
+			// 270도 시계방향 회전: (x, y) -> (y, naturalWidth - x)
+			transformedX = this.textEditPosition.y;
+			transformedY = naturalWidth - this.textEditPosition.x;
+		} else if (rotation === 180) {
+			transformedX = naturalWidth - this.textEditPosition.x;
+			transformedY = naturalHeight - this.textEditPosition.y;
+		}
+		
 		// Save canvas state for text transformation
 		this.canvasContext.save();
 		
-		// Move to text position
-		this.canvasContext.translate(this.textEditPosition.x, this.textEditPosition.y);
+		// Move to transformed text position
+		this.canvasContext.translate(transformedX, transformedY);
 		
-		// Apply inverse rotation to keep preview text readable
-		// New text should always be readable regardless of current image rotation
-		if (this.currentRotation !== 0) {
-			const inverseRotationRad = (-this.currentRotation * Math.PI) / 180;
-			this.canvasContext.rotate(inverseRotationRad);
-		}
+		// Text preview should appear upright (no additional rotation)
+		// The text will be stored with creationRotation and rotated relative to image changes
 		
 		// Draw preview text at origin (we've already translated to the correct position)
 		this.canvasContext.fillText(text, 0, 0);
@@ -2210,7 +2480,7 @@ class ImageViewerModal extends Modal {
 			lineWidth: this.drawingLineWidth,
 			font: font,
 			// Store the rotation at the time of text creation
-			creationRotation: 0
+			creationRotation: this.currentRotation
 		});
 	}
 	
@@ -2390,6 +2660,29 @@ class ImageViewerModal extends Modal {
 				}
 			}
 			if (elementToRemove !== -1) break;
+		} else if (element.type === 'square' && element.startX !== undefined && element.startY !== undefined && element.endX !== undefined && element.endY !== undefined) {
+			// Check if point is inside or near the square border
+			const minX = Math.min(element.startX, element.endX);
+			const maxX = Math.max(element.startX, element.endX);
+			const minY = Math.min(element.startY, element.endY);
+			const maxY = Math.max(element.startY, element.endY);
+			
+			const tolerance = element.lineWidth + 10; // Line width + 10px tolerance
+			
+			// Check if point is within the square area (including border tolerance)
+			if (x >= minX - tolerance && x <= maxX + tolerance && 
+			    y >= minY - tolerance && y <= maxY + tolerance) {
+				// Check if point is on the border (within tolerance of the edges)
+				const onLeftBorder = x >= minX - tolerance && x <= minX + tolerance;
+				const onRightBorder = x >= maxX - tolerance && x <= maxX + tolerance;
+				const onTopBorder = y >= minY - tolerance && y <= minY + tolerance;
+				const onBottomBorder = y >= maxY - tolerance && y <= maxY + tolerance;
+				
+				if (onLeftBorder || onRightBorder || onTopBorder || onBottomBorder) {
+					elementToRemove = i;
+					break;
+				}
+			}
 		}
 	}
 	
@@ -2429,21 +2722,9 @@ class ImageViewerModal extends Modal {
 			this.canvasContext.lineJoin = 'round';
 			
 			// Transform coordinates for rotated canvas (clockwise rotation)
-			const transformedPoints = element.points.map(point => {
-				if (rotation === 90) {
-					// 90도 시계방향 회전: (x, y) -> (naturalHeight - y, x)
-					return { x: naturalHeight - point.y, y: point.x };
-				} else if (rotation === 270) {
-					// 270도 시계방향 회전: (x, y) -> (y, naturalWidth - x)
-					return { x: point.y, y: naturalWidth - point.x };
-				} else if (rotation === 180) {
-					// 180도 회전: (x, y) -> (naturalWidth - x, naturalHeight - y)
-					return { x: naturalWidth - point.x, y: naturalHeight - point.y };
-				} else {
-					// 0도 회전: 변환 없음
-					return point;
-				}
-			});
+			const transformedPoints = element.points.map(point => 
+				this.transformPointForRotation(point, rotation, naturalWidth, naturalHeight)
+			);
 			
 			const firstPoint = transformedPoints[0];
 			this.canvasContext.moveTo(firstPoint.x, firstPoint.y);
@@ -2460,7 +2741,7 @@ class ImageViewerModal extends Modal {
 			this.canvasContext.font = `${fontSize}px Arial`;
 			this.canvasContext.fillStyle = element.color;
 			
-			// Transform text coordinates and rotation (clockwise rotation)
+			// Transform text coordinates based on current rotation
 			let transformedX = element.x;
 			let transformedY = element.y;
 			
@@ -2483,9 +2764,14 @@ class ImageViewerModal extends Modal {
 			// Move to text position
 			this.canvasContext.translate(transformedX, transformedY);
 			
-			// Apply rotation to text
-			if (rotation !== 0) {
-				const rotationRad = (rotation * Math.PI) / 180;
+			// Calculate additional rotation needed
+			// Text should rotate with image changes after creation
+			const creationRotation = element.creationRotation || 0;
+			const additionalRotation = rotation - creationRotation;
+			
+			// Apply additional rotation to text
+			if (additionalRotation !== 0) {
+				const rotationRad = (additionalRotation * Math.PI) / 180;
 				this.canvasContext.rotate(rotationRad);
 			}
 			
@@ -2494,6 +2780,33 @@ class ImageViewerModal extends Modal {
 			
 			// Restore context
 			this.canvasContext.restore();
+			
+		} else if (element.type === 'square' && element.startX !== undefined && element.startY !== undefined && element.endX !== undefined && element.endY !== undefined) {
+			// Transform square coordinates for current rotation
+			const transformedStart = this.transformPointForRotation(
+				{ x: element.startX, y: element.startY }, 
+				rotation, 
+				naturalWidth, 
+				naturalHeight
+			);
+			const transformedEnd = this.transformPointForRotation(
+				{ x: element.endX, y: element.endY }, 
+				rotation, 
+				naturalWidth, 
+				naturalHeight
+			);
+			
+			// Draw square
+			this.canvasContext.strokeStyle = element.color;
+			this.canvasContext.lineWidth = element.lineWidth;
+			
+			// Calculate rectangle dimensions
+			const rectX = Math.min(transformedStart.x, transformedEnd.x);
+			const rectY = Math.min(transformedStart.y, transformedEnd.y);
+			const rectWidth = Math.abs(transformedEnd.x - transformedStart.x);
+			const rectHeight = Math.abs(transformedEnd.y - transformedStart.y);
+			
+			this.canvasContext.strokeRect(rectX, rectY, rectWidth, rectHeight);
 		}
 	}
 	
